@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Madbit watcher</string>
+    <string name="permission_denied">Overlay permission not granted.</string>
+    <string name="madbit_watcher_channel_id">madbit_watcher_channel</string>
+    <string name="madbit_watcher_channel_name">Madbit watcher Channel</string>
+    <string name="notification_title">Madbit DSP 8 status</string>
+    <string name="notification_content">Volume: Preset: F: In:</string>
+</resources>
