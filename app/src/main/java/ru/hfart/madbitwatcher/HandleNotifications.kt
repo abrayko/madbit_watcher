@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
+import com.example.madbitwatcher.R
 import kotlin.random.Random
 
 class HandleNotifications {

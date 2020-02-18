@@ -3,14 +3,15 @@ package ru.hfart.madbitwatcher.service
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import androidx.test.internal.runner.junit4.statement.UiThreadStatement.runOnUiThread
 import com.hoho.android.usbserial.driver.UsbSerialPort
+import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import ru.hfart.madbitwatcher.HandleNotifications
 import java.io.IOException
@@ -33,6 +34,13 @@ class DSPWatcherService : Service() {
 
     private val REGEXP_PATTERN = "(SYS MESSAGE<)([A-Z_]*)\\s([-A-Z0-9]*)(>)"
     private val regex = REGEXP_PATTERN.toRegex()
+
+    //TODO: задать конкретное значение
+    private val vendorId : Int = 0x10c4
+    private val productId : Int = 0xea60
+    private val productName : String = "DSP8_001_V108"
+    private val serialPortNum : Int = 1
+    private val baudRate : Int = 921600
 
     private val binder = DSPWatherBinder()
 
@@ -100,6 +108,7 @@ class DSPWatcherService : Service() {
         Log.d(TAG, "Starting service")
         val notification = HandleNotifications.createNotification(this)
         startForeground(HandleNotifications.NOTIFICATION_ID, notification)
+        connectByCOM()
     }
 
     /**
@@ -121,6 +130,64 @@ class DSPWatcherService : Service() {
         this.dspWatcher = null
     }
 
+    fun connectByCOM() {
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        // find Madbit DSP HD8
+        var device : UsbDevice? = null
+        for (v in usbManager.deviceList.values) {
+            // TODO: проверка на productName = DSP8_001_V108
+            if (v.vendorId == vendorId && v.productId == productId) device = v
+        }
+        if (device == null) {
+            logError("connection failed: device not found")
+            return
+        }
+
+        val driver = UsbSerialProber.getDefaultProber().probeDevice(device)
+        if (driver == null) {
+            logError("connection failed: no driver for device")
+            return
+        }
+        /*if (driver.ports.size < serialPortNum) {
+            logError("connection failed: not enough ports at device")
+            return
+        }*/
+        Log.d(TAG, "USB product name: ${driver.device.productName}")
+
+        val serialPort = driver.ports[serialPortNum]
+        val connection = usbManager.openDevice(driver.device)
+
+        if (connection == null) {
+            if (!usbManager.hasPermission(driver.device)) logError("connection failed: permission denied")
+            else logError("connection failed: open failed")
+            return
+        }
+
+        try {
+            serialPort.open(connection)
+            serialPort.setParameters(
+                baudRate,
+                UsbSerialPort.DATABITS_8,
+                UsbSerialPort.STOPBITS_1,
+                UsbSerialPort.PARITY_NONE
+            )
+            serialPort.dtr = true // for arduino, ...
+            serialPort.rts = true
+            startIoManager(serialPort)
+
+            Log.d(TAG, "CD  - Carrier Detect, ${serialPort.getCD()}")
+            Log.d(TAG, "CTS - Clear To Send, ${serialPort.getCD()}")
+            Log.d(TAG, "DSR - Data Set Ready, ${serialPort.getCD()}")
+            Log.d(TAG, "DTR - Data Terminal Ready, ${serialPort.getCD()}")
+            Log.d(TAG, "RI  - Ring Indicator, ${serialPort.getCD()}")
+            Log.d(TAG, "RTS - Request To Send, ${serialPort.getCD()}")
+        } catch (e: IOException) {
+            logError("connection failed: ${e.message}", e)
+            closeCOMPort(serialPort)
+            return
+        }
+    }
+
     private fun stopIoManager() {
         if (serialIoManager != null) {
             Log.i(TAG, "Stopping io manager ..")
@@ -129,38 +196,10 @@ class DSPWatcherService : Service() {
         }
     }
 
-    private fun startIoManager() {
-        if (sPort != null) {
-            Log.i(TAG, "Starting io manager ..")
-            serialIoManager = SerialInputOutputManager(sPort, serialListener)
-            executor.submit(serialIoManager)
-        }
-    }
-    fun connectByCOM() {
-        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        val connection = usbManager.openDevice(sPort.getDriver().getDevice())
-        if (connection == null) {
-            Log.d(TAG, "Opening device failed")
-            Toast.makeText(applicationContext, "Opening device failed", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        try {
-            sPort.open(connection);
-            sPort.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-            Log.d(TAG, "CD  - Carrier Detect, ${sPort.getCD()}")
-            Log.d(TAG, "CTS - Clear To Send, ${sPort.getCD()}")
-            Log.d(TAG, "DSR - Data Set Ready, ${sPort.getCD()}")
-            Log.d(TAG, "DTR - Data Terminal Ready, ${sPort.getCD()}")
-            Log.d(TAG, "RI  - Ring Indicator, ${sPort.getCD()}")
-            Log.d(TAG, "RTS - Request To Send, ${sPort.getCD()}")
-        } catch (e: IOException) {
-            Log.e(TAG, "Error setting up device: " + e.message, e)
-            Toast.makeText(applicationContext, "Opening device failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            closeCOMPort(sPort)
-            sPort = null
-            return
-        }
+    private fun startIoManager(port: UsbSerialPort) {
+        Log.d(TAG, "Starting io manager ..")
+        serialIoManager = SerialInputOutputManager(port, serialListener)
+        executor.submit(serialIoManager)
     }
 
     fun closeCOMPort(port : UsbSerialPort) {
@@ -184,13 +223,26 @@ class DSPWatcherService : Service() {
                 Log.d(TAG, "Receive Key: $key value: $value")
                 if (dspWatcher != null) {
                     when (key) {
-                        "SYS_VOL" -> dspWatcher.onDSPChangeVolume(value.toInt())
-                        "SYS_CFG" -> dspWatcher.onDSPChangePreset(value)
-                        "SYS_SRC" -> dspWatcher.onDSPChangeInput(value)
-                        "SYS_FREQ"-> dspWatcher.onDSPChangeFS(value.toInt())
+                        "SYS_VOL" -> dspWatcher?.onDSPChangeVolume(value.toInt())
+                        "SYS_CFG" -> dspWatcher?.onDSPChangePreset(value)
+                        "SYS_SRC" -> dspWatcher?.onDSPChangeInput(value)
+                        "SYS_FREQ"-> dspWatcher?.onDSPChangeFS(value.toInt())
                     }
                 }
             }
         }
+    }
+
+    fun logError(msg: String) {
+        logError(msg, null)
+    }
+
+    fun logError(msg: String, err: Exception?) {
+        if (err == null) {
+            Log.e(TAG, msg)
+        } else {
+            Log.e(TAG, msg, err)
+        }
+        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
     }
 }

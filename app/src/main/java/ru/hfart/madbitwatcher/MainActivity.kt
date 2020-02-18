@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.example.madbitwatcher.R
 import ru.hfart.madbitwatcher.service.DSPWatcher
 import ru.hfart.madbitwatcher.service.DSPWatcherService
 import ru.hfart.madbitwatcher.service.HandleService
@@ -104,7 +105,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
 
     private fun unbindMadbitDSPService() {
         Log.d(TAG, "Start unbinding from service")
-        if (serviceConnection != null) this.unbindService(serviceConnection)
+        this.unbindService(serviceConnection)
     }
 
     private fun bindMadbitDSPService() {

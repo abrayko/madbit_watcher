@@ -30,15 +30,18 @@
 
         <service
             android:name="ru.hfart.madbitwatcher.service.DSPWatcherService"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+        </service>
 
         <receiver android:name="ru.hfart.madbitwatcher.MadbitWathcerReceiver"  android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-                <meta-data
-                    android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                    android:resource="@xml/device_filter" />
             </intent-filter>
         </receiver>
 
