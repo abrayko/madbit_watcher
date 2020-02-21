@@ -1,5 +1,7 @@
 package ru.hfart.madbitwatcher.service
 
+import android.app.PendingIntent
+import android.app.PendingIntent.getActivity
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -34,13 +36,6 @@ class DSPWatcherService : Service() {
 
     private val REGEXP_PATTERN = "(SYS MESSAGE<)([A-Z_]*)\\s([-A-Z0-9]*)(>)"
     private val regex = REGEXP_PATTERN.toRegex()
-
-    //TODO: задать конкретное значение
-    private val vendorId : Int = 0x10c4
-    private val productId : Int = 0xea60
-    private val productName : String = "DSP8_001_V108"
-    private val serialPortNum : Int = 1
-    private val baudRate : Int = 921600
 
     private val binder = DSPWatherBinder()
 
@@ -131,61 +126,32 @@ class DSPWatcherService : Service() {
     }
 
     fun connectByCOM() {
-        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        // find Madbit DSP HD8
-        var device : UsbDevice? = null
-        for (v in usbManager.deviceList.values) {
-            // TODO: проверка на productName = DSP8_001_V108
-            if (v.vendorId == vendorId && v.productId == productId) device = v
-        }
+        val device = USBSerialHandler.getDevice(this)
         if (device == null) {
             logError("connection failed: device not found")
             return
         }
 
-        val driver = UsbSerialProber.getDefaultProber().probeDevice(device)
-        if (driver == null) {
-            logError("connection failed: no driver for device")
-            return
-        }
-        /*if (driver.ports.size < serialPortNum) {
-            logError("connection failed: not enough ports at device")
-            return
-        }*/
-        Log.d(TAG, "USB product name: ${driver.device.productName}")
-
-        val serialPort = driver.ports[serialPortNum]
-        val connection = usbManager.openDevice(driver.device)
-
-        if (connection == null) {
-            if (!usbManager.hasPermission(driver.device)) logError("connection failed: permission denied")
-            else logError("connection failed: open failed")
+        if (!USBSerialHandler.checkUSBPermision(this, device)) {
+            logError("connection failed: permission missed")
             return
         }
 
-        try {
-            serialPort.open(connection)
-            serialPort.setParameters(
-                baudRate,
-                UsbSerialPort.DATABITS_8,
-                UsbSerialPort.STOPBITS_1,
-                UsbSerialPort.PARITY_NONE
-            )
-            serialPort.dtr = true // for arduino, ...
-            serialPort.rts = true
+        val serialPort = USBSerialHandler.openDevice(this, device)
+        if (serialPort != null) {
             startIoManager(serialPort)
-
-            Log.d(TAG, "CD  - Carrier Detect, ${serialPort.getCD()}")
-            Log.d(TAG, "CTS - Clear To Send, ${serialPort.getCD()}")
-            Log.d(TAG, "DSR - Data Set Ready, ${serialPort.getCD()}")
-            Log.d(TAG, "DTR - Data Terminal Ready, ${serialPort.getCD()}")
-            Log.d(TAG, "RI  - Ring Indicator, ${serialPort.getCD()}")
-            Log.d(TAG, "RTS - Request To Send, ${serialPort.getCD()}")
-        } catch (e: IOException) {
-            logError("connection failed: ${e.message}", e)
-            closeCOMPort(serialPort)
-            return
         }
+                /*Log.d(TAG, "Request permissions")
+                val usbPermissionIntent = PendingIntent.getBroadcast(
+                    getActivity(),
+                    0,
+                    Intent(de.kai_morich.simple_usb_terminal.TerminalFragment.INTENT_ACTION_GRANT_USB),
+                    0
+                )
+                usbManager.requestPermission(driver.device, usbPermissionIntent)*/
+
+
+
     }
 
     private fun stopIoManager() {
@@ -202,14 +168,6 @@ class DSPWatcherService : Service() {
         executor.submit(serialIoManager)
     }
 
-    fun closeCOMPort(port : UsbSerialPort) {
-        try {
-            port.close()
-        } catch (e2: IOException) {
-            // Ignore.
-        }
-        return
-    }
 
     fun onReceiveSerialData(data: ByteArray?) {
         val lines : List<String>? = data?.let { String(it).replace("\r\n", "\n").split("\n") }
