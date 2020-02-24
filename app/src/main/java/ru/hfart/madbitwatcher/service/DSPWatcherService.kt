@@ -1,22 +1,15 @@
 package ru.hfart.madbitwatcher.service
 
-import android.app.PendingIntent
-import android.app.PendingIntent.getActivity
 import android.app.Service
-import android.content.Context
 import android.content.Intent
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.hoho.android.usbserial.driver.UsbSerialPort
-import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import ru.hfart.madbitwatcher.HandleNotifications
-import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -103,7 +96,7 @@ class DSPWatcherService : Service() {
         Log.d(TAG, "Starting service")
         val notification = HandleNotifications.createNotification(this)
         startForeground(HandleNotifications.NOTIFICATION_ID, notification)
-        connectByCOM()
+        connectToDSP()
     }
 
     /**
@@ -125,7 +118,7 @@ class DSPWatcherService : Service() {
         this.dspWatcher = null
     }
 
-    fun connectByCOM() {
+    fun connectToDSP() {
         val device = USBSerialHandler.getDevice(this)
         if (device == null) {
             logError("connection failed: device not found")

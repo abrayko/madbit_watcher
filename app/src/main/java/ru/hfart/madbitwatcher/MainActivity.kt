@@ -2,10 +2,8 @@ package ru.hfart.madbitwatcher
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
+import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -13,17 +11,20 @@ import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.example.madbitwatcher.BuildConfig
 import com.example.madbitwatcher.R
-import ru.hfart.madbitwatcher.service.DSPWatcher
-import ru.hfart.madbitwatcher.service.DSPWatcherService
-import ru.hfart.madbitwatcher.service.HandleService
-import ru.hfart.madbitwatcher.service.DSPWatherBinder
+import ru.hfart.madbitwatcher.service.*
 import java.lang.ref.WeakReference
 
 // TODO: отвязка от сервиса onDestroy, а может и при уходе в background
 class MainActivity : AppCompatActivity(), DSPWatcher {
 
     private val TAG = "MAIN_ACTIVITY"
+
+    val INTENT_ACTION_GRANT_USB: String =
+        BuildConfig.APPLICATION_ID + ".GRANT_USB"
+    private var broadcastReceiver: BroadcastReceiver? = null
+    private var hasPermission = false
 
     private val OVERLAY_PERMISSION_REQUEST_CODE = 100
 
@@ -52,21 +53,68 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
         setContentView(R.layout.activity_main)
 
         bindMadbitDSPService()
+        createPermissionReciever()
 
         //showFloatingView(this, true)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (weakService == null) null else weakService.get()!!.unregisterDSPWatcher()
+        getService()!!.unregisterDSPWatcher()
         unbindMadbitDSPService()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (hasPermission) {
+            val service = getService()
+            if (service !=null) runOnUiThread(Runnable { service.connectToDSP() })
+        } else {
+            // TODO: возможно правильней вызывать проверку при событии подключения USB устройства
+            checkUSBPermission()
+        }
+    }
+
+    override fun onPause() {
+        unregisterReceiver(broadcastReceiver)
+        super.onPause()
+    }
+
+    private fun createPermissionReciever() {
+        broadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == INTENT_ACTION_GRANT_USB) {
+                    hasPermission =
+                        intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                    val service = getService()
+                    if (service !=null && hasPermission) service.connectToDSP()
+                }
+            }
+        }
+    }
+
+    private fun checkUSBPermission() {
+        val device = USBSerialHandler.getDevice(this)
+        if (device == null) {
+            logError("connection failed: device not found")
+            return
+        }
+
+        if (!USBSerialHandler.checkUSBPermision(this, device)) {
+            hasPermission = false
+            registerReceiver(
+                broadcastReceiver,
+                IntentFilter(INTENT_ACTION_GRANT_USB)
+            )
+        }
+    }
+
+    fun getService() : DSPWatcherService? {
+        return if (weakService == null) null else weakService.get()
+    }
+
     @SuppressLint("NewApi")
-    private fun showFloatingView(
-        context: Context,
-        isShowOverlayPermission: Boolean
-    ) { // API22
+    private fun showFloatingView(context: Context, isShowOverlayPermission: Boolean) { // API22
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1) {
             startMadbitDSPService()
             return
@@ -89,6 +137,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
         }
     }
 
+
     /**
      * Handles permission to display overlays.
      */
@@ -97,6 +146,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
         if (requestCode == OVERLAY_PERMISSION_REQUEST_CODE) {
             showFloatingView(this, false)
         }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun startMadbitDSPService() {
