@@ -2,16 +2,10 @@ package ru.hfart.madbitwatcher.service
 
 interface DSPWatcher {
 
-    // TODO: вообще это не относится к MadbitDSP и надо бы вынести в отдельный интерфейс
-    // А может просто в активити реализовать интерфейс ServiceConnection
-    /** сохранение IBinder с целью последующего получения Service и обращения к его методам
-     */
-    //fun bindService(binder: MadbitWatherBinder)
-
     /** получение значение громкости */
     fun onDSPChangeVolume (volume : Int)
 
-    // TODO: переделать на unum
+    // TODO: переделать на enum
     /** получение значения типа входа */
     fun onDSPChangeInput (input : String)
 
@@ -27,4 +21,7 @@ interface DSPWatcher {
 
     /** получение события об отключении от проца */
     fun onDSPDisconnect ()
+
+    /** TODO: временно, только для отладки */
+    fun onDataRecieve (line : String)
 }

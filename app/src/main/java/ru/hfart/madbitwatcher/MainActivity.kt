@@ -10,9 +10,8 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.example.madbitwatcher.BuildConfig
-import com.example.madbitwatcher.R
 import ru.hfart.madbitwatcher.service.*
 import java.lang.ref.WeakReference
 
@@ -20,6 +19,8 @@ import java.lang.ref.WeakReference
 class MainActivity : AppCompatActivity(), DSPWatcher {
 
     private val TAG = "MAIN_ACTIVITY"
+
+    private var receiveText: TextView? = null
 
     val INTENT_ACTION_GRANT_USB: String =
         BuildConfig.APPLICATION_ID + ".GRANT_USB"
@@ -52,9 +53,9 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        bindMadbitDSPService()
-        createPermissionReciever()
+        receiveText = findViewById(R.id.receive_text) // TextView performance decreases with number of spans
 
+        bindMadbitDSPService()
         //showFloatingView(this, true)
     }
 
@@ -76,7 +77,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
     }
 
     override fun onPause() {
-        unregisterReceiver(broadcastReceiver)
+        if (broadcastReceiver != null) unregisterReceiver(broadcastReceiver)
         super.onPause()
     }
 
@@ -96,12 +97,13 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
     private fun checkUSBPermission() {
         val device = USBSerialHandler.getDevice(this)
         if (device == null) {
-            logError("connection failed: device not found")
+            Log.d(TAG, "connection failed: device not found")
             return
         }
 
         if (!USBSerialHandler.checkUSBPermision(this, device)) {
             hasPermission = false
+            createPermissionReciever()
             registerReceiver(
                 broadcastReceiver,
                 IntentFilter(INTENT_ACTION_GRANT_USB)
@@ -170,6 +172,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
             .append("Set volume: $volume")
             .toString()
         Log.d(TAG, msg)
+        receiveText!!.append("$msg\n")
     }
 
     /** получение значения типа входа */
@@ -178,6 +181,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
             .append("Set input: $input")
             .toString()
         Log.d(TAG, msg)
+        receiveText!!.append("$msg\n")
     }
 
     /** получение значения частоты дискретизации */
@@ -186,6 +190,7 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
             .append("Set FS: $fs")
             .toString()
         Log.d(TAG, msg)
+        receiveText!!.append("$msg\n")
     }
 
     /** получение значения пресета */
@@ -194,16 +199,23 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
             .append("Set preset: $preset")
             .toString()
         Log.d(TAG, msg)
+        receiveText!!.append("$msg\n")
     }
 
     /** получение события о подключении к процу */
     override fun onDSPConnect() {
         Log.d(TAG, "DSP connected")
+        receiveText!!.append("DSP connected\n")
     }
 
     /** получение события об отключении от проца */
     override fun onDSPDisconnect() {
         Log.d(TAG, "DSP disconnected")
+        receiveText!!.append("DSP disconnected\n")
     }
 
+    /** TODO: временно, только для отладки */
+    override fun onDataRecieve(line: String) {
+        receiveText!!.append(line)
+    }
 }

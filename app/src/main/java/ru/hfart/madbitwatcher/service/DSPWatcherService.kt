@@ -27,6 +27,8 @@ class DSPWatcherService : Service() {
 
     private val TAG = "DSP_WATCHER_SERVICE"
 
+    private var serialDataBuffer : String? = null
+
     private val REGEXP_PATTERN = "(SYS MESSAGE<)([A-Z_]*)\\s([-A-Z0-9]*)(>)"
     private val regex = REGEXP_PATTERN.toRegex()
 
@@ -163,22 +165,38 @@ class DSPWatcherService : Service() {
 
 
     fun onReceiveSerialData(data: ByteArray?) {
-        val lines : List<String>? = data?.let { String(it).replace("\r\n", "\n").split("\n") }
-        if (lines == null || lines.isEmpty()) return
-        for (line in lines) {
-            val matchResult = regex.find(line)
-            if (matchResult != null) {
-                val vals = matchResult.groupValues
-                val key = vals[2]
-                val value = vals[3]
-                Log.d(TAG, "Receive Key: $key value: $value")
-                if (dspWatcher != null) {
-                    when (key) {
-                        "SYS_VOL" -> dspWatcher?.onDSPChangeVolume(value.toInt())
-                        "SYS_CFG" -> dspWatcher?.onDSPChangePreset(value)
-                        "SYS_SRC" -> dspWatcher?.onDSPChangeInput(value)
-                        "SYS_FREQ"-> dspWatcher?.onDSPChangeFS(value.toInt())
+        if (data == null) return
+        synchronized (this) {
+            val sb = StringBuilder()
+            sb.append(serialDataBuffer).append(String(data).replace("\r\n", "\n"))
+            val lines = sb.toString().split("\n")
+            if (lines.isEmpty()) return
+
+            // Проверяем каждую строку на искомый шаблон регулярки.
+            // Если последняя строка не прошла, то оставляем ее на будущее - будем приклеивать новые данные и опать проверять
+            for (i in lines.indices) {
+                //DEBUG:
+                /*if (dspWatcher != null && i != lines.size-1) {
+                    dspWatcher?.onDataRecieve("data: ${lines[i]}\n")
+                }*/
+
+                val matchResult = regex.find(lines[i])
+                if (matchResult != null) {
+                    val vals = matchResult.groupValues
+                    val key = vals[2]
+                    val value = vals[3]
+                    Log.d(TAG, "Receive Key: $key value: $value")
+                    if (dspWatcher != null) {
+                        when (key) {
+                            "SYS_VOL" -> dspWatcher?.onDSPChangeVolume(value.toInt())
+                            "SYS_CFG" -> dspWatcher?.onDSPChangePreset(value)
+                            "SYS_SRC" -> dspWatcher?.onDSPChangeInput(value)
+                            "SYS_FREQ" -> dspWatcher?.onDSPChangeFS(value.toInt())
+                        }
                     }
+                }
+                if (i == lines.size-1 && matchResult == null) {
+                    serialDataBuffer = lines[i]
                 }
             }
         }
