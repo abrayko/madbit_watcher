@@ -2,6 +2,7 @@ package ru.hfart.madbitwatcher
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
+import android.app.PendingIntent
 import android.content.*
 import android.hardware.usb.UsbManager
 import android.net.Uri
@@ -15,17 +16,11 @@ import androidx.appcompat.app.AppCompatActivity
 import ru.hfart.madbitwatcher.service.*
 import java.lang.ref.WeakReference
 
-// TODO: отвязка от сервиса onDestroy, а может и при уходе в background
 class MainActivity : AppCompatActivity(), DSPWatcher {
 
     private val TAG = "MAIN_ACTIVITY"
 
     private var receiveText: TextView? = null
-
-    val INTENT_ACTION_GRANT_USB: String =
-        BuildConfig.APPLICATION_ID + ".GRANT_USB"
-    private var broadcastReceiver: BroadcastReceiver? = null
-    private var hasPermission = false
 
     private val OVERLAY_PERMISSION_REQUEST_CODE = 100
 
@@ -65,51 +60,6 @@ class MainActivity : AppCompatActivity(), DSPWatcher {
         unbindMadbitDSPService()
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (hasPermission) {
-            val service = getService()
-            if (service !=null) runOnUiThread(Runnable { service.connectToDSP() })
-        } else {
-            // TODO: возможно правильней вызывать проверку при событии подключения USB устройства
-            checkUSBPermission()
-        }
-    }
-
-    override fun onPause() {
-        if (broadcastReceiver != null) unregisterReceiver(broadcastReceiver)
-        super.onPause()
-    }
-
-    private fun createPermissionReciever() {
-        broadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == INTENT_ACTION_GRANT_USB) {
-                    hasPermission =
-                        intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                    val service = getService()
-                    if (service !=null && hasPermission) service.connectToDSP()
-                }
-            }
-        }
-    }
-
-    private fun checkUSBPermission() {
-        val device = USBSerialHandler.getDevice(this)
-        if (device == null) {
-            Log.d(TAG, "connection failed: device not found")
-            return
-        }
-
-        if (!USBSerialHandler.checkUSBPermision(this, device)) {
-            hasPermission = false
-            createPermissionReciever()
-            registerReceiver(
-                broadcastReceiver,
-                IntentFilter(INTENT_ACTION_GRANT_USB)
-            )
-        }
-    }
 
     fun getService() : DSPWatcherService? {
         return if (weakService == null) null else weakService.get()

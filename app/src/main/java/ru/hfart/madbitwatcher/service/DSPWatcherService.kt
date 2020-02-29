@@ -136,17 +136,6 @@ class DSPWatcherService : Service() {
         if (serialPort != null) {
             startIoManager(serialPort)
         }
-                /*Log.d(TAG, "Request permissions")
-                val usbPermissionIntent = PendingIntent.getBroadcast(
-                    getActivity(),
-                    0,
-                    Intent(de.kai_morich.simple_usb_terminal.TerminalFragment.INTENT_ACTION_GRANT_USB),
-                    0
-                )
-                usbManager.requestPermission(driver.device, usbPermissionIntent)*/
-
-
-
     }
 
     private fun stopIoManager() {

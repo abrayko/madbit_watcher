@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="ru.hfart.madbitwatcher">
 
+    <uses-feature android:name="android.hardware.usb.host" />
+
     <!-- Permissions for foreground display -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Foreground Service permission(API level 28 or higher) -->
@@ -20,11 +22,21 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:ignore="GoogleAppIndexingWarning">
-        <activity android:name=".MainActivity">
+
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleInstance">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".USBReceiverActivity"
+            android:excludeFromRecents="true"
+            android:directBootAware="true"
+            android:launchMode="singleInstance">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
@@ -36,7 +48,6 @@
         <service
             android:name=".service.DSPWatcherService"
             android:exported="false">
-
         </service>
 
         <receiver android:name=".MadbitWathcerReceiver"  android:exported="true">
