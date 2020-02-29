@@ -12,10 +12,9 @@ class HandleService {
         private val TAG = "HANDLE_SERVICE"
 
         fun startService(context: Context) {
+            Log.d(TAG, "Starting service")
             val service = DSPWatcherService::class.java
             val intent = Intent(context, service)
-            //val key = MadbitWatcherService.EXTRA_CUTOUT_SAFE_AREA
-            //intent.putExtra(key, FloatingViewManager.findCutoutSafeArea(this))
             ContextCompat.startForegroundService(context, intent)
         }
 

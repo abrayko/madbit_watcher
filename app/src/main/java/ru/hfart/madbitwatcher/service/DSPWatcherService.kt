@@ -96,6 +96,7 @@ class DSPWatcherService : Service() {
 
     fun forceForeground() {
         Log.d(TAG, "Starting service")
+        HandleService.startService(applicationContext)
         val notification = HandleNotifications.createNotification(this)
         startForeground(HandleNotifications.NOTIFICATION_ID, notification)
         connectToDSP()

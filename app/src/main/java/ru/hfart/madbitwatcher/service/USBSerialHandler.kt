@@ -23,8 +23,8 @@ class USBSerialHandler {
         private val productName : String = "DSP8_001_V108"
         private val serialPortNum : Int = 0
 
-        //private val baudRate : Int = 921600
-        private val baudRate : Int = 9600
+        private val baudRate : Int = 921600
+        //private val baudRate : Int = 9600
 
         /**
         @return true - использование USB устройства разрешено
