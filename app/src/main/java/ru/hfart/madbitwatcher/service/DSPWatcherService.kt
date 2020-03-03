@@ -169,6 +169,9 @@ class DSPWatcherService : Service() {
                 /*if (dspWatcher != null && i != lines.size-1) {
                     dspWatcher?.onDataRecieve("data: ${lines[i]}\n")
                 }*/
+                if (dspWatcher != null ) {
+                    dspWatcher?.onDataRecieve("data: ${lines[i]}\n")
+                }
 
                 val matchResult = regex.find(lines[i])
                 if (matchResult != null) {
